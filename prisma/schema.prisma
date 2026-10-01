@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Hospital {
+  id                 String   @id @default(cuid())
+  name               String
+  city               String
+  country            String
+  address            String?
+  emergencyAvailable Boolean  @default(false)
+  languages          String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  doctors Doctor[]
+
+  @@index([city])
+  @@index([city, emergencyAvailable])
+}
+
+model Doctor {
+  id         String   @id @default(cuid())
+  name       String
+  specialty  String
+  city       String
+  languages  String[]
+  bio        String?
+  hospitalId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([specialty])
+  @@index([city])
+  @@index([hospitalId])
+  @@index([city, specialty])
+}
