@@ -110,5 +110,19 @@ If nextStep is "clarify", clarificationQuestion must contain one concise questio
 Otherwise clarificationQuestion must be null.
 
 concernSummary should be a short neutral summary in the user's language.
+
+GUIDANCE MESSAGE:
+
+If nextStep is "general_guidance":
+- guidanceMessage must contain a concise helpful response in the user's language.
+- provide health navigation or general informational guidance only.
+- do not diagnose.
+- do not claim certainty about the cause of symptoms.
+- do not invent doctor, hospital, medication, availability, pricing, or provider information.
+- explain uncertainty clearly when relevant.
+- suggest professional evaluation only as navigation guidance, not as a diagnosis.
+
+If nextStep is not "general_guidance":
+guidanceMessage must be null.
 `;
 }

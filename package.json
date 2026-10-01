@@ -14,7 +14,8 @@
     "tools:check": "tsx scripts/check-tools.ts",
     "safety:check": "tsx scripts/check-safety.ts",
     "agent:check-preflight": "tsx scripts/check-agent-preflight.ts",
-    "ai:check-context": "tsx scripts/check-context-extractor.ts"
+    "ai:check-context": "tsx scripts/check-context-extractor.ts",
+    "agent:check-routing": "tsx scripts/check-agent-routing.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

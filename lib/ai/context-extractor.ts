@@ -2,19 +2,23 @@ import {
   contextExtractionSchema,
   type ExtractedContext,
 } from "./context-schema";
+
 import {
   GROQ_MODEL,
   groq,
 } from "./groq";
+
 import {
   buildContextExtractionPrompt,
 } from "./prompts";
+
 import type {
   AgentState,
 } from "./types";
 
 const contextJsonSchema = {
   type: "object",
+
   properties: {
     intent: {
       type: "string",
@@ -112,6 +116,17 @@ const contextJsonSchema = {
         },
       ],
     },
+
+    guidanceMessage: {
+      anyOf: [
+        {
+          type: "string",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
   },
 
   required: [
@@ -123,6 +138,7 @@ const contextJsonSchema = {
     "missingFields",
     "nextStep",
     "clarificationQuestion",
+    "guidanceMessage",
   ],
 
   additionalProperties: false,
@@ -150,9 +166,10 @@ export async function extractContext(
       messages: [
         {
           role: "system",
-          content: buildContextExtractionPrompt(
-            state.locale,
-          ),
+          content:
+            buildContextExtractionPrompt(
+              state.locale,
+            ),
         },
 
         ...conversationMessages,
@@ -165,16 +182,20 @@ export async function extractContext(
 
       response_format: {
         type: "json_schema",
+
         json_schema: {
           name: "healtrip_context",
+
           strict: true,
+
           schema: contextJsonSchema,
         },
       },
     });
 
   const content =
-    completion.choices[0]?.message?.content;
+    completion.choices[0]?.message
+      ?.content;
 
   if (!content) {
     throw new Error(
@@ -182,8 +203,15 @@ export async function extractContext(
     );
   }
 
-  const parsedJson: unknown =
-    JSON.parse(content);
+  let parsedJson: unknown;
+
+  try {
+    parsedJson = JSON.parse(content);
+  } catch {
+    throw new Error(
+      "The AI context extractor returned invalid JSON.",
+    );
+  }
 
   return contextExtractionSchema.parse(
     parsedJson,

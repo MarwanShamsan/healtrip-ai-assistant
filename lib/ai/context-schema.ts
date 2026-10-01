@@ -69,6 +69,12 @@ export const contextExtractionSchema = z
       .trim()
       .max(300)
       .nullable(),
+
+    guidanceMessage: z
+      .string()
+      .trim()
+      .max(600)
+      .nullable(),
   })
   .strict();
 
