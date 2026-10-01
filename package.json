@@ -13,12 +13,14 @@
     "tools:check-details": "tsx scripts/check-provider-details.ts",
     "tools:check": "tsx scripts/check-tools.ts",
     "safety:check": "tsx scripts/check-safety.ts",
-    "agent:check-preflight": "tsx scripts/check-agent-preflight.ts"
+    "agent:check-preflight": "tsx scripts/check-agent-preflight.ts",
+    "ai:check-context": "tsx scripts/check-context-extractor.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "dotenv": "^17.4.2",
+    "groq-sdk": "^1.6.0",
     "next": "16.3.8",
     "pg": "^8.23.1",
     "react": "19.2.8",
