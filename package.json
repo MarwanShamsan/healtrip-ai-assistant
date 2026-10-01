@@ -12,7 +12,8 @@
     "tools:check-hospitals": "tsx scripts/check-search-hospitals.ts",
     "tools:check-details": "tsx scripts/check-provider-details.ts",
     "tools:check": "tsx scripts/check-tools.ts",
-    "safety:check": "tsx scripts/check-safety.ts"
+    "safety:check": "tsx scripts/check-safety.ts",
+    "agent:check-preflight": "tsx scripts/check-agent-preflight.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
