@@ -70,7 +70,8 @@ export async function POST(
 
   const {
     mode,
-    doctorId,
+    providerType,
+    providerId,
     reservationReference,
     reportedConcern,
     conversationState,
@@ -80,14 +81,12 @@ export async function POST(
   /*
    * Provider grounding check.
    *
-   * The doctor must have been present in the
-   * doctor results shown during the current
-   * provider-search workflow.
+   * The selected doctor or hospital must have
+   * been returned in the current trusted search.
    *
-   * For this prototype the structured state
-   * is client-carried. In a production system
-   * this state should be server-managed or
-   * cryptographically protected.
+   * For this prototype the structured state is
+   * client-carried. A production system should
+   * manage or cryptographically protect it.
    */
   const lastSearch =
     conversationState.lastSearch;
@@ -95,15 +94,32 @@ export async function POST(
   if (
     !lastSearch ||
     lastSearch.providerType !==
-      "doctor" ||
+      providerType ||
     !lastSearch.shownProviderIds.includes(
-      doctorId,
+      providerId,
     )
   ) {
     return errorResponse(
       409,
       "PROVIDER_NOT_IN_CURRENT_RESULTS",
-      "The selected doctor is not part of the current trusted provider results.",
+      "The selected provider is not part of the current trusted provider results.",
+    );
+  }
+
+  /*
+   * The original reservation-sharing flow requires
+   * a booking reference for doctors. Hospital visit
+   * summaries may be prepared without one.
+   */
+  if (
+    providerType ===
+      "doctor" &&
+    !reservationReference
+  ) {
+    return errorResponse(
+      400,
+      "RESERVATION_REFERENCE_REQUIRED",
+      "A reservation reference is required for a doctor summary.",
     );
   }
 
@@ -132,7 +148,7 @@ export async function POST(
    * - provider data invented by AI
    *
    * Only the user-reviewed reported information
-   * and the structured recommendation are included.
+   * and structured recommendation are included.
    */
   const preparedShare = {
     status:
@@ -140,7 +156,9 @@ export async function POST(
         ? "ready_to_share"
         : "preview",
 
-    doctorId,
+    providerType,
+
+    providerId,
 
     reservationReference,
 

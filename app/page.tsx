@@ -261,7 +261,10 @@ type PreparedShare = {
     | "preview"
     | "ready_to_share";
 
-  doctorId:
+  providerType:
+    "doctor" | "hospital";
+
+  providerId:
     string;
 
   reservationReference:
@@ -353,19 +356,25 @@ const copy = {
     unavailable:
       "Not available",
     prepareSummary:
-      "Prepare reservation summary",
+      "Prepare summary",
     sharePrompt:
-      "If you already have a reservation with one of these doctors, select the doctor and provide the reservation reference. HealTrip can prepare a concise summary for review before sharing.",
+      "Select a doctor or hospital to prepare a concise summary of the important symptoms reported in this conversation. Review and edit it before sharing.",
     reportedInformation:
       "Relevant symptoms to share",
     reportedInformationHint:
-      "Only relevant symptoms reported during the conversation are included. Review, add, or edit them before creating the summary.",
-    selectedDoctor:
-      "Selected doctor",
+      "Only clinically relevant information already reported in this conversation is prefilled. Review, add, or edit it before creating the summary.",
+    reportedInformationPlaceholder:
+      "No relevant symptoms were captured yet. Add them here if needed.",
+    selectedProvider:
+      "Selected provider",
     reservationReference:
       "Reservation reference",
     reservationPlaceholder:
       "Enter your reservation reference",
+    hospitalReference:
+      "Visit / reference number (optional)",
+    hospitalReferencePlaceholder:
+      "Enter a visit or reference number if available",
     previewSummary:
       "Preview summary",
     preparing:
@@ -379,7 +388,7 @@ const copy = {
     recommendation:
       "Recommendation",
     consentText:
-      "I consent to preparing this summary for sharing with the selected doctor for this reservation.",
+      "I consent to preparing this summary for sharing with the selected provider.",
     consentButton:
       "Confirm and prepare for sharing",
     confirming:
@@ -446,20 +455,25 @@ const copy = {
     unavailable:
       "غير متاحة",
     prepareSummary:
-      "إعداد ملخص للحجز",
+      "إعداد الملخص",
     sharePrompt:
-      "إذا كان لديك حجز مع أحد هؤلاء الأطباء، اختر الطبيب وأدخل مرجع الحجز. يمكن لـ HealTrip إعداد ملخص مختصر للمراجعة قبل المشاركة.",
+      "اختر طبيبًا أو مستشفى لإعداد ملخص مختصر للأعراض المهمة التي ذكرتها في هذه المحادثة. راجعه وعدّله قبل المشاركة.",
     reportedInformation:
       "الأعراض المهمة للمشاركة",
-
     reportedInformationHint:
-      "يتم تضمين الأعراض المهمة التي ذكرتها أثناء المحادثة فقط. راجعها أو أضف إليها أو عدّلها قبل إعداد الملخص.",
-    selectedDoctor:
-      "الطبيب المختار",
+      "يتم تعبئة المعلومات الصحية المهمة التي ذكرتها في المحادثة فقط. راجعها أو أضف إليها أو عدّلها قبل إعداد الملخص.",
+    reportedInformationPlaceholder:
+      "لم يتم التقاط أعراض مهمة بعد. أضفها هنا إذا لزم الأمر.",
+    selectedProvider:
+      "مقدم الخدمة المختار",
     reservationReference:
       "مرجع الحجز",
     reservationPlaceholder:
       "أدخل مرجع الحجز",
+    hospitalReference:
+      "رقم الزيارة / المرجع (اختياري)",
+    hospitalReferencePlaceholder:
+      "أدخل رقم الزيارة أو المرجع إن وجد",
     previewSummary:
       "معاينة الملخص",
     preparing:
@@ -473,7 +487,7 @@ const copy = {
     recommendation:
       "التوصية",
     consentText:
-      "أوافق على إعداد هذا الملخص للمشاركة مع الطبيب المختار لهذا الحجز.",
+      "أوافق على إعداد هذا الملخص للمشاركة مع مقدم الخدمة المختار.",
     consentButton:
       "تأكيد وإعداد الملخص للمشاركة",
     confirming:
@@ -604,13 +618,66 @@ function getMessageBubbleClasses(
 }
 
 function buildReportedInformation(
-  clinicalSummary:
-    string | null | undefined,
+  messages: ChatMessage[],
+  fallbackSummary: string | null | undefined,
 ): string {
-  
+  /*
+   * Prefer user messages that were immediately
+   * followed by deterministic urgent routing.
+   * This captures reported urgent symptoms while
+   * excluding greetings, city names, and unrelated
+   * follow-up questions.
+   */
+  const urgentReportedMessages =
+    messages
+      .map(
+        (message, index) => {
+          if (
+            message.role !==
+            "user"
+          ) {
+            return null;
+          }
+
+          const nextMessage =
+            messages[
+              index + 1
+            ];
+
+          if (
+            nextMessage?.role ===
+              "assistant" &&
+            nextMessage.action ===
+              "urgent"
+          ) {
+            return message.content.trim();
+          }
+
+          return null;
+        },
+      )
+      .filter(
+        (
+          value,
+        ): value is string =>
+          Boolean(value),
+      );
+
+  const uniqueUrgentMessages =
+    Array.from(
+      new Set(
+        urgentReportedMessages,
+      ),
+    );
+
   const value =
-    clinicalSummary?.trim() ??
-    "";
+    uniqueUrgentMessages.length >
+    0
+      ? uniqueUrgentMessages.join(
+          "\n",
+        )
+      : fallbackSummary?.trim() ??
+        "";
 
   return value.slice(
     0,
@@ -622,7 +689,7 @@ function ProviderCard({
   provider,
   locale,
   selected,
-  onSelectDoctor,
+  onSelectProvider,
 }: {
   provider:
     Provider;
@@ -630,9 +697,9 @@ function ProviderCard({
     Locale;
   selected:
     boolean;
-  onSelectDoctor:
+  onSelectProvider:
     (
-      doctor: DoctorProvider,
+      provider: Provider,
     ) => void;
 }) {
   const t =
@@ -716,7 +783,7 @@ function ProviderCard({
         <button
           type="button"
           onClick={() =>
-            onSelectDoctor(
+            onSelectProvider(
               provider,
             )
           }
@@ -730,7 +797,13 @@ function ProviderCard({
   }
 
   return (
-    <div className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5">
+    <div
+      className={`min-w-0 rounded-3xl border bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
+        selected
+          ? "border-cyan-500 ring-2 ring-cyan-100"
+          : "border-slate-200"
+      }`}
+    >
       <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <p className="text-lg font-semibold text-slate-900">
@@ -783,6 +856,18 @@ function ProviderCard({
           </p>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() =>
+          onSelectProvider(
+            provider,
+          )
+        }
+        className="mt-5 inline-flex w-full touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg"
+      >
+        {t.prepareSummary}
+      </button>
     </div>
   );
 }
@@ -825,11 +910,11 @@ export default function Home() {
     useState(false);
 
   const [
-    selectedDoctor,
-    setSelectedDoctor,
+    selectedProvider,
+    setSelectedProvider,
   ] =
     useState<
-      DoctorProvider | null
+      Provider | null
     >(null);
 
   const [
@@ -919,21 +1004,22 @@ export default function Home() {
   }, [
     messages,
     isLoading,
-    selectedDoctor,
+    selectedProvider,
     preparedShare,
   ]);
 
-  function selectDoctor(
-    doctor: DoctorProvider,
+  function selectProvider(
+    provider: Provider,
   ) {
-    setSelectedDoctor(
-      doctor,
+    setSelectedProvider(
+      provider,
     );
     setReservationReference(
       "",
     );
     setReportedConcernDraft(
       buildReportedInformation(
+        messages,
         conversationState
           ?.lastClinicalSummary,
       ),
@@ -947,7 +1033,7 @@ export default function Home() {
   }
 
   function cancelShare() {
-    setSelectedDoctor(
+    setSelectedProvider(
       null,
     );
     setReservationReference(
@@ -970,10 +1056,14 @@ export default function Home() {
       | "confirm",
   ) {
     if (
-      !selectedDoctor ||
+      !selectedProvider ||
       !conversationState ||
-      !reservationReference.trim() ||
-      !reportedConcernDraft.trim()
+      !reportedConcernDraft.trim() ||
+      (
+        selectedProvider.providerType ===
+          "doctor" &&
+        !reservationReference.trim()
+      )
     ) {
       return;
     }
@@ -999,8 +1089,10 @@ export default function Home() {
             body:
               JSON.stringify({
                 mode,
-                doctorId:
-                  selectedDoctor.id,
+                providerType:
+                  selectedProvider.providerType,
+                providerId:
+                  selectedProvider.id,
                 reservationReference:
                   reservationReference.trim(),
                 reportedConcern:
@@ -1017,15 +1109,16 @@ export default function Home() {
         (await response.json()) as
           ShareApiResponse;
 
-      if (
-        !response.ok ||
-        !data.ok
-      ) {
+      if ("error" in data) {
         setShareError(
-          data.ok
-            ? shareCopy.error
-            : data.error
-                .message,
+          data.error.message,
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        setShareError(
+          shareCopy.error,
         );
         return;
       }
@@ -1117,15 +1210,9 @@ export default function Home() {
         (await response.json()) as
           ChatApiResponse;
 
-      if (
-        !response.ok ||
-        !data.ok
-      ) {
+      if ("error" in data) {
         const errorMessage =
-          data.ok
-            ? t.error
-            : data.error
-                .message;
+          data.error.message;
 
         setMessages(
           (current) => [
@@ -1145,6 +1232,27 @@ export default function Home() {
         return;
       }
 
+      if (!response.ok) {
+        setMessages(
+          (current) => [
+            ...current,
+            {
+              id:
+                createId(),
+              role:
+                "assistant",
+              content:
+                t.error,
+              responseLanguage:
+                uiLocale,
+              action:
+                "guidance",
+            },
+          ],
+        );
+        return;
+      }
+
       setConversationState(
         data.conversationState,
       );
@@ -1153,7 +1261,7 @@ export default function Home() {
         data.response.action ===
         "provider_results"
       ) {
-        setSelectedDoctor(
+        setSelectedProvider(
           null,
         );
         setReservationReference(
@@ -1420,14 +1528,12 @@ export default function Home() {
                           messageLocale
                         ];
 
-                      const hasDoctors =
-                        message.providers?.some(
-                          (
-                            provider,
-                          ) =>
-                            provider.providerType ===
-                            "doctor",
-                        ) ?? false;
+                      const hasProviders =
+                        Boolean(
+                          message.providers &&
+                            message.providers.length >
+                              0,
+                        );
 
                       return (
                         <div
@@ -1517,18 +1623,18 @@ export default function Home() {
                                           messageLocale
                                         }
                                         selected={
-                                          selectedDoctor?.id ===
+                                          selectedProvider?.id ===
                                           provider.id
                                         }
-                                        onSelectDoctor={
-                                          selectDoctor
+                                        onSelectProvider={
+                                          selectProvider
                                         }
                                       />
                                     ),
                                   )
                                 )}
 
-                                {hasDoctors && (
+                                {hasProviders && (
                                   <div className="rounded-3xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-sky-50 px-5 py-4 text-sm leading-6 text-slate-700 shadow-sm">
                                     {messageCopy.sharePrompt}
                                   </div>
@@ -1547,7 +1653,7 @@ export default function Home() {
                     },
                   )}
 
-                  {selectedDoctor && (
+                  {selectedProvider && (
                     <div
                       dir={
                         shareLocale ===
@@ -1561,24 +1667,21 @@ export default function Home() {
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             {
-                              shareCopy.selectedDoctor
+                              shareCopy.selectedProvider
                             }
                           </p>
 
                           <p className="mt-1 text-lg font-bold text-slate-900">
                             {
-                              selectedDoctor.name
+                              selectedProvider.name
                             }
                           </p>
 
                           <p className="mt-1 text-sm text-slate-600">
-                            {
-                              selectedDoctor.specialty
-                            }{" "}
-                            ·{" "}
-                            {
-                              selectedDoctor.hospital.name
-                            }
+                            {selectedProvider.providerType ===
+                            "doctor"
+                              ? `${selectedProvider.specialty} · ${selectedProvider.hospital.name}`
+                              : `${selectedProvider.city}, ${selectedProvider.country}`}
                           </p>
                         </div>
 
@@ -1635,15 +1738,19 @@ export default function Home() {
                           }
                           rows={6}
                           dir="auto"
+                          placeholder={
+                            shareCopy.reportedInformationPlaceholder
+                          }
                           className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base leading-6 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 sm:text-sm"
                         />
                       </div>
 
                       <div className="mt-5">
                         <label className="text-sm font-semibold text-slate-800">
-                          {
-                            shareCopy.reservationReference
-                          }
+                          {selectedProvider.providerType ===
+                          "doctor"
+                            ? shareCopy.reservationReference
+                            : shareCopy.hospitalReference}
                         </label>
 
                         <input
@@ -1666,7 +1773,10 @@ export default function Home() {
                             );
                           }}
                           placeholder={
-                            shareCopy.reservationPlaceholder
+                            selectedProvider.providerType ===
+                            "doctor"
+                              ? shareCopy.reservationPlaceholder
+                              : shareCopy.hospitalReferencePlaceholder
                           }
                           maxLength={
                             100
@@ -1680,8 +1790,12 @@ export default function Home() {
                           type="button"
                           disabled={
                             shareLoading ||
-                            !reservationReference.trim() ||
-                            !reportedConcernDraft.trim()
+                            !reportedConcernDraft.trim() ||
+                            (
+                              selectedProvider.providerType ===
+                                "doctor" &&
+                              !reservationReference.trim()
+                            )
                           }
                           onClick={() =>
                             void callShareApi(
@@ -1717,25 +1831,30 @@ export default function Home() {
                             <div className="rounded-2xl bg-slate-50 p-4">
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 {
-                                  shareCopy.selectedDoctor
+                                  shareCopy.selectedProvider
                                 }
                               </p>
                               <p className="mt-1 font-semibold text-slate-900">
                                 {
-                                  selectedDoctor.name
+                                  selectedProvider.name
                                 }
                               </p>
                             </div>
 
                             <div className="rounded-2xl bg-slate-50 p-4">
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                {
-                                  shareCopy.reservationReference
-                                }
+                                {selectedProvider.providerType ===
+                                "doctor"
+                                  ? shareCopy.reservationReference
+                                  : shareCopy.hospitalReference}
                               </p>
                               <p className="mt-1 font-semibold text-slate-900">
                                 {
-                                  preparedShare.reservationReference
+                                  preparedShare.reservationReference ||
+                                  (shareLocale ===
+                                  "ar"
+                                    ? "غير متوفر"
+                                    : "Not provided")
                                 }
                               </p>
                             </div>
@@ -1860,7 +1979,6 @@ export default function Home() {
                     ref={
                       textareaRef
                     }
-                    
                     value={
                       input
                     }

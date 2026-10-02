@@ -17,11 +17,17 @@ export const shareRequestSchema =
         shareModeSchema,
 
       /*
-       * This must be the ID of a doctor
-       * already returned in the current
-       * provider-search flow.
+       * The selected provider must come from
+       * the trusted provider results already
+       * shown in the current conversation.
        */
-      doctorId:
+      providerType:
+        z.enum([
+          "doctor",
+          "hospital",
+        ]),
+
+      providerId:
         z
           .string()
           .trim()
@@ -29,22 +35,21 @@ export const shareRequestSchema =
           .max(120),
 
       /*
-       * We intentionally keep the validation
-       * broad because booking systems use
-       * different reference formats.
+       * Required for doctor reservation-sharing.
+       * Optional for hospital/urgent visit summaries.
        */
       reservationReference:
         z
           .string()
           .trim()
-          .min(1)
-          .max(100),
+          .max(100)
+          .optional()
+          .default(""),
 
       /*
-       * User-reviewed information to include
-       * in the reservation summary. The UI
-       * prefills this from user-authored chat
-       * messages, but the user may edit it.
+       * User-reviewed symptoms / relevant clinical
+       * information. The UI prefills only clinically
+       * relevant information and the user may edit it.
        */
       reportedConcern:
         z
@@ -82,7 +87,13 @@ export const preparedShareSchema =
       status:
         shareStatusSchema,
 
-      doctorId:
+      providerType:
+        z.enum([
+          "doctor",
+          "hospital",
+        ]),
+
+      providerId:
         z.string(),
 
       reservationReference:
