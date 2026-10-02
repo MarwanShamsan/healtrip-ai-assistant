@@ -7,19 +7,32 @@ config({
   override: true,
 });
 
-const connectionString = process.env["DATABASE_URL"];
+/*
+ * Seed/administrative operations should prefer
+ * the direct Neon connection.
+ *
+ * The application itself can continue using the
+ * pooled DATABASE_URL.
+ */
+const connectionString =
+  process.env["DIRECT_URL"] ??
+  process.env["DATABASE_URL"];
 
 if (!connectionString) {
-  throw new Error("DATABASE_URL is not configured.");
+  throw new Error(
+    "DIRECT_URL or DATABASE_URL is not configured.",
+  );
 }
 
-const adapter = new PrismaPg({
-  connectionString,
-});
+const adapter =
+  new PrismaPg({
+    connectionString,
+  });
 
-const prisma = new PrismaClient({
-  adapter,
-});
+const prisma =
+  new PrismaClient({
+    adapter,
+  });
 
 const hospitals = [
   {
@@ -208,21 +221,53 @@ const doctors = [
 ];
 
 async function main() {
-  await prisma.$transaction([
-    prisma.doctor.deleteMany(),
-    prisma.hospital.deleteMany(),
-  ]);
+  /*
+   * Sequential deletes are intentional.
+   *
+   * The previous seed used:
+   *
+   * prisma.$transaction([...])
+   *
+   * which could time out while acquiring
+   * a remote Neon transaction.
+   *
+   * This is demo seed data, so a large
+   * transaction is unnecessary.
+   */
+
+  console.log(
+    "Clearing existing demo doctors...",
+  );
+
+  await prisma.doctor.deleteMany();
+
+  console.log(
+    "Clearing existing demo hospitals...",
+  );
+
+  await prisma.hospital.deleteMany();
+
+  console.log(
+    "Creating demo hospitals...",
+  );
 
   await prisma.hospital.createMany({
     data: hospitals,
   });
 
+  console.log(
+    "Creating demo doctors...",
+  );
+
   await prisma.doctor.createMany({
     data: doctors,
   });
 
-  const hospitalCount = await prisma.hospital.count();
-  const doctorCount = await prisma.doctor.count();
+  const hospitalCount =
+    await prisma.hospital.count();
+
+  const doctorCount =
+    await prisma.doctor.count();
 
   console.log(
     `Seed complete: ${hospitalCount} demo hospitals, ${doctorCount} demo doctors.`,
@@ -231,8 +276,13 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error("Seed failed:", error);
-    process.exitCode = 1;
+    console.error(
+      "Seed failed:",
+      error,
+    );
+
+    process.exitCode =
+      1;
   })
   .finally(async () => {
     await prisma.$disconnect();
