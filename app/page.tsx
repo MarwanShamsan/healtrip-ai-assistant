@@ -357,9 +357,9 @@ const copy = {
     sharePrompt:
       "If you already have a reservation with one of these doctors, select the doctor and provide the reservation reference. HealTrip can prepare a concise summary for review before sharing.",
     reportedInformation:
-      "Information to share",
+      "Relevant symptoms to share",
     reportedInformationHint:
-      "This field is prefilled from what you told HealTrip. Review and edit it before creating the summary.",
+      "Only relevant symptoms reported during the conversation are included. Review, add, or edit them before creating the summary.",
     selectedDoctor:
       "Selected doctor",
     reservationReference:
@@ -450,9 +450,10 @@ const copy = {
     sharePrompt:
       "إذا كان لديك حجز مع أحد هؤلاء الأطباء، اختر الطبيب وأدخل مرجع الحجز. يمكن لـ HealTrip إعداد ملخص مختصر للمراجعة قبل المشاركة.",
     reportedInformation:
-      "المعلومات المراد مشاركتها",
+      "الأعراض المهمة للمشاركة",
+
     reportedInformationHint:
-      "تم تعبئة هذا الحقل مسبقًا من المعلومات التي ذكرتها لـ HealTrip. راجعها وعدّلها قبل إعداد الملخص.",
+      "يتم تضمين الأعراض المهمة التي ذكرتها أثناء المحادثة فقط. راجعها أو أضف إليها أو عدّلها قبل إعداد الملخص.",
     selectedDoctor:
       "الطبيب المختار",
     reservationReference:
@@ -603,25 +604,12 @@ function getMessageBubbleClasses(
 }
 
 function buildReportedInformation(
-  messages: ChatMessage[],
-  fallbackSummary: string | null | undefined,
+  clinicalSummary:
+    string | null | undefined,
 ): string {
-  const userProvidedInformation =
-    messages
-      .filter(
-        (message) =>
-          message.role ===
-          "user",
-      )
-      .map((message) =>
-        message.content.trim(),
-      )
-      .filter(Boolean)
-      .join("\n");
-
+  
   const value =
-    userProvidedInformation ||
-    fallbackSummary?.trim() ||
+    clinicalSummary?.trim() ??
     "";
 
   return value.slice(
@@ -946,7 +934,6 @@ export default function Home() {
     );
     setReportedConcernDraft(
       buildReportedInformation(
-        messages,
         conversationState
           ?.lastClinicalSummary,
       ),
@@ -1873,6 +1860,7 @@ export default function Home() {
                     ref={
                       textareaRef
                     }
+                    
                     value={
                       input
                     }
