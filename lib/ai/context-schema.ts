@@ -1,83 +1,138 @@
 import { z } from "zod";
 
-export const userIntentSchema = z.enum([
-  "symptom_guidance",
-  "provider_search",
-  "hospital_search",
-  "second_opinion",
-  "care_navigation",
-  "general_health_question",
-  "follow_up",
-]);
+import {
+  clinicalAssessmentSchema,
+} from "./clinical-assessment-schema";
 
-export const specialtySchema = z.enum([
-  "Cardiology",
-  "General Medicine",
-  "Neurology",
-  "Orthopedics",
-  "Dermatology",
-  "ENT",
-]);
+export const intentSchema =
+  z.enum([
+    "symptom_guidance",
+    "provider_search",
+    "hospital_search",
+    "second_opinion",
+    "care_navigation",
+    "general_health_question",
+    "follow_up",
+    "off_topic",
+  ]);
 
-export const providerTypeSchema = z.enum([
-  "doctor",
-  "hospital",
-]);
+export const specialtySchema =
+  z.enum([
+    "Cardiology",
+    "General Medicine",
+    "Neurology",
+    "Orthopedics",
+    "Dermatology",
+    "ENT",
+  ]);
 
-export const contextNextStepSchema = z.enum([
-  "clarify",
-  "doctor_search",
-  "hospital_search",
-  "general_guidance",
-]);
+export const specialtySourceSchema =
+  z.enum([
+    "explicit",
+    "navigation_default",
+    "none",
+  ]);
 
-export const contextExtractionSchema = z
-  .object({
-    intent: userIntentSchema,
+export const providerTypeSchema =
+  z.enum([
+    "doctor",
+    "hospital",
+  ]);
 
-    concernSummary: z
-      .string()
-      .trim()
-      .min(1)
-      .max(300),
+export const missingFieldSchema =
+  z.enum([
+    "city",
+    "specialty",
+    "providerType",
+    "symptomDetails",
+    "userGoal",
+  ]);
 
-    specialty: specialtySchema.nullable(),
+export const extractedNextStepSchema =
+  z.enum([
+    "clarify",
+    "doctor_search",
+    "hospital_search",
+    "general_guidance",
+  ]);
 
-    city: z
-      .string()
-      .trim()
-      .min(1)
-      .max(80)
-      .nullable(),
+/*
+ * LEGACY COMPATIBILITY SCHEMA
+ *
+ * The active application runtime now uses:
+ *
+ * - router-schema.ts
+ * - conversation-state.ts
+ * - conversation-router.ts
+ * - clinical-assessor.ts
+ *
+ * This schema remains temporarily because
+ * context-extractor.ts and some older
+ * development scripts are still compiled.
+ */
+export const contextExtractionSchema =
+  z
+    .object({
+      intent:
+        intentSchema,
 
-    providerType: providerTypeSchema.nullable(),
+      concernSummary:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(500),
 
-    missingFields: z.array(
-      z.enum([
-        "city",
-        "specialty",
-        "providerType",
-        "symptomDetails",
-        "userGoal",
-      ]),
-    ),
+      specialty:
+        specialtySchema
+          .nullable(),
 
-    nextStep: contextNextStepSchema,
+      specialtySource:
+        specialtySourceSchema,
 
-    clarificationQuestion: z
-      .string()
-      .trim()
-      .max(300)
-      .nullable(),
+      city:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(80)
+          .nullable(),
 
-    guidanceMessage: z
-      .string()
-      .trim()
-      .max(600)
-      .nullable(),
-  })
-  .strict();
+      providerType:
+        providerTypeSchema
+          .nullable(),
 
-export type ExtractedContext = z.infer<
-  typeof contextExtractionSchema
->;
+      missingFields:
+        z
+          .array(
+            missingFieldSchema,
+          )
+          .max(5),
+
+      nextStep:
+        extractedNextStepSchema,
+
+      clarificationQuestion:
+        z
+          .string()
+          .trim()
+          .max(500)
+          .nullable(),
+
+      guidanceMessage:
+        z
+          .string()
+          .trim()
+          .max(900)
+          .nullable(),
+
+      clinicalAssessment:
+        clinicalAssessmentSchema
+          .nullable(),
+    })
+    .strict();
+
+export type ExtractedContext =
+  z.infer<
+    typeof contextExtractionSchema
+  >;

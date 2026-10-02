@@ -1,41 +1,101 @@
 import { z } from "zod";
 
-export const localeSchema = z.enum(["ar", "en"]);
+import {
+  careRecommendationStateSchema,
+  conversationStateSchema,
+} from "./conversation-state";
 
-export const chatMessageSchema = z
-  .object({
-    role: z.enum(["user", "assistant"]),
-    content: z
-      .string()
-      .trim()
-      .min(1, "Message content is required.")
-      .max(2000, "Message content is too long."),
-  })
-  .strict();
+export const localeSchema =
+  z.enum([
+    "ar",
+    "en",
+  ]);
 
-export const chatRequestSchema = z
-  .object({
-    message: z
-      .string()
-      .trim()
-      .min(1, "Message is required.")
-      .max(2000, "Message is too long."),
+export const assistantActionSchema =
+  z.enum([
+    "urgent",
+    "clarify",
+    "provider_results",
+    "guidance",
+  ]);
 
-    locale: localeSchema.optional(),
+export const chatMessageSchema =
+  z
+    .object({
+      role:
+        z.enum([
+          "user",
+          "assistant",
+        ]),
 
-    conversation: z
-      .array(chatMessageSchema)
-      .max(20, "Conversation history is too large.")
-      .default([]),
-  })
-  .strict();
+      content:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(2000),
 
-export type Locale = z.infer<typeof localeSchema>;
+      /*
+       * Retained for compatibility with
+       * existing frontend conversation history.
+       *
+       * Operational state now lives in
+       * conversationState.
+       */
+      action:
+        assistantActionSchema
+          .optional(),
 
-export type ChatMessage = z.infer<
-  typeof chatMessageSchema
->;
+      careRecommendation:
+        careRecommendationStateSchema
+          .optional(),
+    })
+    .strict();
 
-export type ChatRequest = z.infer<
-  typeof chatRequestSchema
->;
+export const chatRequestSchema =
+  z
+    .object({
+      message:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(2000),
+
+      /*
+       * UI preference only.
+       *
+       * The AI router chooses the response
+       * language for each individual turn.
+       */
+      locale:
+        localeSchema.optional(),
+
+      conversation:
+        z
+          .array(
+            chatMessageSchema,
+          )
+          .max(20)
+          .default([]),
+
+      conversationState:
+        conversationStateSchema
+          .optional(),
+    })
+    .strict();
+
+export type Locale =
+  z.infer<
+    typeof localeSchema
+  >;
+
+export type ChatMessage =
+  z.infer<
+    typeof chatMessageSchema
+  >;
+
+export type ChatRequest =
+  z.infer<
+    typeof chatRequestSchema
+  >;

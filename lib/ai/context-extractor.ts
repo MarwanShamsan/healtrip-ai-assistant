@@ -16,12 +16,167 @@ import type {
   AgentState,
 } from "./types";
 
+const clinicalAssessmentJsonSchema = {
+  type: "object",
+
+  properties: {
+    assessmentSummary: {
+      type: "string",
+    },
+
+    recommendationRationale: {
+      type: "string",
+    },
+
+    duration: {
+      anyOf: [
+        {
+          type: "string",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+
+    onset: {
+      anyOf: [
+        {
+          type: "string",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+
+    severity: {
+      anyOf: [
+        {
+          type: "string",
+
+          enum: [
+            "mild",
+            "moderate",
+            "severe",
+          ],
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+
+    associatedSymptoms: {
+      type: "array",
+
+      items: {
+        type: "string",
+      },
+    },
+
+    relevantNegatives: {
+      type: "array",
+
+      items: {
+        type: "string",
+      },
+    },
+
+    functionalImpact: {
+      anyOf: [
+        {
+          type: "string",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+
+    missingClinicalInfo: {
+      type: "array",
+
+      items: {
+        type: "string",
+
+        enum: [
+          "duration",
+          "onset",
+          "severity",
+          "associatedSymptoms",
+          "functionalImpact",
+          "relevantHistory",
+          "redFlags",
+        ],
+      },
+    },
+
+    assessmentComplete: {
+      type: "boolean",
+    },
+
+    careRecommendation: {
+      type: "string",
+
+      enum: [
+        "continue_assessment",
+        "monitor_and_self_care",
+        "see_doctor_routine",
+        "see_doctor_soon",
+        "urgent_in_person",
+      ],
+    },
+
+    nextQuestion: {
+      anyOf: [
+        {
+          type: "string",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+
+    recommendationMessage: {
+      anyOf: [
+        {
+          type: "string",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+
+  required: [
+    "assessmentSummary",
+    "recommendationRationale",
+    "duration",
+    "onset",
+    "severity",
+    "associatedSymptoms",
+    "relevantNegatives",
+    "functionalImpact",
+    "missingClinicalInfo",
+    "assessmentComplete",
+    "careRecommendation",
+    "nextQuestion",
+    "recommendationMessage",
+  ],
+
+  additionalProperties: false,
+} as const;
+
 const contextJsonSchema = {
   type: "object",
 
   properties: {
     intent: {
       type: "string",
+
       enum: [
         "symptom_guidance",
         "provider_search",
@@ -30,6 +185,7 @@ const contextJsonSchema = {
         "care_navigation",
         "general_health_question",
         "follow_up",
+        "off_topic",
       ],
     },
 
@@ -41,6 +197,7 @@ const contextJsonSchema = {
       anyOf: [
         {
           type: "string",
+
           enum: [
             "Cardiology",
             "General Medicine",
@@ -53,6 +210,16 @@ const contextJsonSchema = {
         {
           type: "null",
         },
+      ],
+    },
+
+    specialtySource: {
+      type: "string",
+
+      enum: [
+        "explicit",
+        "navigation_default",
+        "none",
       ],
     },
 
@@ -71,6 +238,7 @@ const contextJsonSchema = {
       anyOf: [
         {
           type: "string",
+
           enum: [
             "doctor",
             "hospital",
@@ -84,8 +252,10 @@ const contextJsonSchema = {
 
     missingFields: {
       type: "array",
+
       items: {
         type: "string",
+
         enum: [
           "city",
           "specialty",
@@ -98,6 +268,7 @@ const contextJsonSchema = {
 
     nextStep: {
       type: "string",
+
       enum: [
         "clarify",
         "doctor_search",
@@ -127,18 +298,30 @@ const contextJsonSchema = {
         },
       ],
     },
+
+    clinicalAssessment: {
+      anyOf: [
+        clinicalAssessmentJsonSchema,
+
+        {
+          type: "null",
+        },
+      ],
+    },
   },
 
   required: [
     "intent",
     "concernSummary",
     "specialty",
+    "specialtySource",
     "city",
     "providerType",
     "missingFields",
     "nextStep",
     "clarificationQuestion",
     "guidanceMessage",
+    "clinicalAssessment",
   ],
 
   additionalProperties: false,
@@ -148,47 +331,67 @@ export async function extractContext(
   state: AgentState,
 ): Promise<ExtractedContext> {
   const conversationMessages =
-    state.conversation.map((message) => ({
-      role: message.role,
-      content: message.content,
-    }));
+    state.conversation.map(
+      (message) => ({
+        role:
+          message.role,
+
+        content:
+          message.content,
+      }),
+    );
 
   const completion =
     await groq.chat.completions.create({
-      model: GROQ_MODEL,
+      model:
+        GROQ_MODEL,
 
-      reasoning_effort: "none",
+      reasoning_effort:
+        "none",
 
-      max_completion_tokens: 200,
+      max_completion_tokens:
+        450,
 
-      temperature: 0.1,
+      temperature:
+        0.2,
 
       messages: [
         {
-          role: "system",
+          role:
+            "system",
+
           content:
             buildContextExtractionPrompt(
               state.locale,
+              state.urgentContextActive,
+              state.previousCareRecommendation,
             ),
         },
 
         ...conversationMessages,
 
         {
-          role: "user",
-          content: state.userMessage,
+          role:
+            "user",
+
+          content:
+            state.userMessage,
         },
       ],
 
       response_format: {
-        type: "json_schema",
+        type:
+          "json_schema",
 
         json_schema: {
-          name: "healtrip_context",
+          name:
+            "healtrip_context",
 
-          strict: true,
+          strict:
+            true,
 
-          schema: contextJsonSchema,
+          schema:
+            contextJsonSchema,
         },
       },
     });
@@ -206,7 +409,10 @@ export async function extractContext(
   let parsedJson: unknown;
 
   try {
-    parsedJson = JSON.parse(content);
+    parsedJson =
+      JSON.parse(
+        content,
+      );
   } catch {
     throw new Error(
       "The AI context extractor returned invalid JSON.",

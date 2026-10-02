@@ -3,6 +3,14 @@ import type {
 } from "../providers/types";
 
 import type {
+  ClinicalAssessment,
+} from "./clinical-assessment-schema";
+
+import type {
+  ConversationState,
+} from "./conversation-state";
+
+import type {
   ChatMessage,
   Locale,
 } from "./schemas";
@@ -15,84 +23,115 @@ export type AgentNextStep =
   | "general_guidance";
 
 export type AgentState = {
-  locale: Locale;
+  locale:
+    Locale;
 
-  userMessage: string;
+  userMessage:
+    string;
 
-  conversation: ChatMessage[];
+  conversation:
+    ChatMessage[];
 
   safetyStatus:
     | "clear"
     | "urgent";
 
-  intent?: string;
+  conversationState:
+    ConversationState;
 
-  specialty?: string;
+  clinicalAssessment?:
+    ClinicalAssessment;
 
-  city?: string;
+  toolResult?:
+    unknown;
+
+  /*
+   * Compatibility fields retained during
+   * migration from the old monolithic agent.
+   */
+  urgentContextActive:
+    boolean;
+
+  previousCareRecommendation?:
+    ConversationState["careRecommendation"];
+
+  intent?:
+    string;
+
+  specialty?:
+    string;
+
+  city?:
+    string;
 
   providerType?:
-    | "doctor"
-    | "hospital";
+    "doctor" | "hospital";
 
-  missingFields: string[];
+  missingFields:
+    string[];
 
-  nextStep?: AgentNextStep;
-
-  toolResult?: unknown;
+  nextStep?:
+    AgentNextStep;
 };
 
 export type AgentResponse =
   | {
-      action: "urgent";
-      message: string;
-    }
-  | {
-      action: "clarify";
-      message: string;
-    }
-  | {
-      action: "provider_results";
-      message: string;
-      providers: ProviderRecord[];
-    }
-  | {
-      action: "guidance";
-      message: string;
-    };
+      action:
+        "urgent";
 
-export type AgentPreflightResult =
-  | {
-      ok: false;
-      code: "INVALID_REQUEST";
-      message: string;
+      message:
+        string;
     }
   | {
-      ok: true;
-      stage: "complete";
-      state: AgentState;
-      response: AgentResponse;
+      action:
+        "clarify";
+
+      message:
+        string;
     }
   | {
-      ok: true;
-      stage: "ready";
-      state: AgentState;
+      action:
+        "provider_results";
+
+      message:
+        string;
+
+      providers:
+        ProviderRecord[];
+    }
+  | {
+      action:
+        "guidance";
+
+      message:
+        string;
     };
 
 export type AgentRunResult =
   | {
-      ok: false;
+      ok:
+        false;
+
       code:
         | "INVALID_REQUEST"
         | "AI_UNAVAILABLE";
-      message: string;
+
+      message:
+        string;
     }
   | {
-      ok: true;
-      state: AgentState;
-      response: AgentResponse;
+      ok:
+        true;
+
+      state:
+        AgentState;
+
+      response:
+        AgentResponse;
+
       meta: {
-        aiUsed: boolean;
+        aiUsed:
+          boolean;
 
         toolUsed?:
           | "search_doctors"

@@ -1,195 +1,233 @@
 import assert from "node:assert/strict";
-import { config } from "dotenv";
+
+import {
+  config,
+} from "dotenv";
+
+import type {
+  AgentState,
+} from "../lib/ai/types";
 
 config({
-  path: ".env.local",
-  override: true,
+  path:
+    ".env.local",
+
+  override:
+    true,
 });
 
 async function main() {
   const {
-    prepareAgentRequest,
-  } = await import("../lib/ai/agent");
-
-  const {
-    extractContext,
+    routeConversation,
   } = await import(
-    "../lib/ai/context-extractor"
-  );
-
-  const englishPreflight =
-    prepareAgentRequest({
-      message:
-        "I need a cardiologist in Riyadh.",
-      locale: "en",
-      conversation: [],
-    });
-
-  assert.equal(
-    englishPreflight.ok,
-    true,
-  );
-
-  if (
-    !englishPreflight.ok ||
-    englishPreflight.stage !== "ready"
-  ) {
-    throw new Error(
-      "English request did not reach AI stage.",
-    );
-  }
-
-  const englishContext =
-    await extractContext(
-      englishPreflight.state,
-    );
-
-  assert.equal(
-    englishContext.specialty,
-    "Cardiology",
-  );
-
-  assert.equal(
-    englishContext.city,
-    "Riyadh",
-  );
-
-  assert.equal(
-    englishContext.nextStep,
-    "doctor_search",
-  );
-
-  const arabicPreflight =
-    prepareAgentRequest({
-      message:
-        "أحتاج طبيب قلب في الرياض",
-      locale: "ar",
-      conversation: [],
-    });
-
-  assert.equal(
-    arabicPreflight.ok,
-    true,
-  );
-
-  if (
-    !arabicPreflight.ok ||
-    arabicPreflight.stage !== "ready"
-  ) {
-    throw new Error(
-      "Arabic request did not reach AI stage.",
-    );
-  }
-
-  const arabicContext =
-    await extractContext(
-      arabicPreflight.state,
-    );
-
-  assert.equal(
-    arabicContext.specialty,
-    "Cardiology",
-  );
-
-  assert.equal(
-    arabicContext.city,
-    "Riyadh",
-  );
-
-  assert.equal(
-    arabicContext.nextStep,
-    "doctor_search",
-  );
-
-  const clarificationPreflight =
-    prepareAgentRequest({
-      message:
-        "I need a cardiologist.",
-      locale: "en",
-      conversation: [],
-    });
-
-  if (
-    !clarificationPreflight.ok ||
-    clarificationPreflight.stage !== "ready"
-  ) {
-    throw new Error(
-      "Clarification request did not reach AI stage.",
-    );
-  }
-
-  const clarificationContext =
-    await extractContext(
-      clarificationPreflight.state,
-    );
-
-  assert.equal(
-    clarificationContext.nextStep,
-    "clarify",
-  );
-
-  assert.ok(
-    clarificationContext.missingFields.includes(
-      "city",
-    ),
-  );
-
-  assert.ok(
-    clarificationContext.clarificationQuestion,
-  );
-
-  const symptomPreflight =
-    prepareAgentRequest({
-      message:
-        "I've had headaches for several days and I'm not sure what I should do.",
-      locale: "en",
-      conversation: [],
-    });
-
-  if (
-    !symptomPreflight.ok ||
-    symptomPreflight.stage !== "ready"
-  ) {
-    throw new Error(
-      "Symptom request did not reach AI stage.",
-    );
-  }
-
-  const symptomContext =
-    await extractContext(
-      symptomPreflight.state,
-    );
-
-  assert.equal(
-    symptomContext.intent,
-    "symptom_guidance",
+    "../lib/ai/conversation-router"
   );
 
   console.log(
-    "Bilingual AI context extraction checks passed.",
+    "Checking semantic conversation router...",
+  );
+
+  /*
+   * The user was already shown one
+   * emergency-capable hospital in Riyadh
+   * and now asks in Arabic for another.
+   *
+   * There is intentionally no phrase
+   * matching here. Qwen must understand
+   * the semantic follow-up.
+   */
+  const state: AgentState = {
+    locale:
+      "ar",
+
+    userMessage:
+      "في غيره؟",
+
+    conversation: [
+      {
+        role:
+          "user",
+
+        content:
+          "I need an emergency hospital in Riyadh.",
+      },
+
+      {
+        role:
+          "assistant",
+
+        content:
+          "These demo facilities report emergency services in the provider database.",
+
+        action:
+          "provider_results",
+      },
+    ],
+
+    safetyStatus:
+      "urgent",
+
+    conversationState: {
+      phase:
+        "urgent_care",
+
+      responseLanguage:
+        "ar",
+
+      preferredName:
+        null,
+
+      careRecommendation:
+        "urgent_in_person",
+
+      providerType:
+        "hospital",
+
+      specialty:
+        null,
+
+      city:
+        "Riyadh",
+
+      awaiting:
+        null,
+
+      lastSearch: {
+        providerType:
+          "hospital",
+
+        city:
+          "Riyadh",
+
+        specialty:
+          null,
+
+        emergencyAvailable:
+          true,
+
+        shownProviderIds: [
+          "hosp_demo_riyadh_central",
+        ],
+      },
+
+      /*
+       * New state fields added by the
+       * stateful clinical-assessment refactor.
+       *
+       * This router test does not need
+       * clinical content, so null is correct.
+       */
+      lastClinicalSummary:
+        null,
+
+      lastRecommendationRationale:
+        null,
+
+      lastRecommendationMessage:
+        null,
+    },
+
+    urgentContextActive:
+      true,
+
+    previousCareRecommendation:
+      "urgent_in_person",
+
+    missingFields:
+      [],
+  };
+
+  const route =
+    await routeConversation(
+      state,
+    );
+
+  console.log(
+    "Router result:",
   );
 
   console.log(
     JSON.stringify(
-      {
-        englishContext,
-        arabicContext,
-        clarificationContext,
-        symptomContext,
-      },
+      route,
       null,
       2,
     ),
   );
-}
 
-main().catch((error) => {
-  console.error(
-    "AI context extraction check failed:",
-    error instanceof Error
-      ? error.message
-      : "unknown_error",
+  assert.equal(
+    route.action,
+    "more_provider_results",
   );
 
-  process.exitCode = 1;
-});
+  assert.equal(
+    route.responseLanguage,
+    "ar",
+  );
+
+  /*
+   * Also verify language switching.
+   *
+   * Same conversation state, but latest
+   * message changes to English.
+   */
+  const englishFollowUp: AgentState =
+    {
+      ...state,
+
+      locale:
+        "en",
+
+      userMessage:
+        "actually show me options in Jeddah instead",
+    };
+
+  const englishRoute =
+    await routeConversation(
+      englishFollowUp,
+    );
+
+  console.log(
+    "Language-switch result:",
+  );
+
+  console.log(
+    JSON.stringify(
+      englishRoute,
+      null,
+      2,
+    ),
+  );
+
+  assert.equal(
+    englishRoute.action,
+    "update_location",
+  );
+
+  assert.equal(
+    englishRoute.responseLanguage,
+    "en",
+  );
+
+  assert.equal(
+    englishRoute.city,
+    "Jeddah",
+  );
+
+  console.log(
+    "Semantic router checks passed.",
+  );
+}
+
+main().catch(
+  (error) => {
+    console.error(
+      "Semantic router check failed:",
+      error instanceof Error
+        ? error.message
+        : "unknown_error",
+    );
+
+    process.exitCode =
+      1;
+  },
+);

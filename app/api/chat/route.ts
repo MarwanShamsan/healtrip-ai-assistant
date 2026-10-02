@@ -1,27 +1,28 @@
-import { NextResponse } from "next/server";
+import {
+  NextResponse,
+} from "next/server";
 
 import {
   runAgent,
 } from "../../../lib/ai/agent";
 
-export const runtime = "nodejs";
-
-type ChatApiErrorResponse = {
-  ok: false;
-  error: {
-    code:
-      | "INVALID_REQUEST"
-      | "INVALID_JSON"
-      | "AI_UNAVAILABLE"
-      | "INTERNAL_ERROR";
-    message: string;
-  };
-};
+export const runtime =
+  "nodejs";
 
 const JSON_HEADERS = {
   "Content-Type":
     "application/json; charset=utf-8",
 };
+
+function doctorSharePrompt(
+  language: "en" | "ar",
+): string {
+  if (language === "ar") {
+    return "إذا كان لديك حجز مع أحد هؤلاء الأطباء، اختر الطبيب وأدخل مرجع الحجز. يمكنني إعداد ملخص مختصر للأعراض والتوصية لمراجعته قبل مشاركته مع الطبيب.";
+  }
+
+  return "If you already have a reservation with one of these doctors, select the doctor and enter your reservation reference. I can prepare a concise summary of your reported symptoms and care recommendation for you to review before sharing.";
+}
 
 export async function POST(
   request: Request,
@@ -29,77 +30,138 @@ export async function POST(
   let body: unknown;
 
   try {
-    body = await request.json();
+    body =
+      await request.json();
   } catch {
-    const response: ChatApiErrorResponse = {
-      ok: false,
-      error: {
-        code: "INVALID_JSON",
-        message:
-          "The request body must contain valid JSON.",
-      },
-    };
-
     return NextResponse.json(
-      response,
       {
-        status: 400,
-        headers: JSON_HEADERS,
+        ok:
+          false,
+
+        error: {
+          code:
+            "INVALID_JSON",
+
+          message:
+            "The request body must contain valid JSON.",
+        },
+      },
+
+      {
+        status:
+          400,
+
+        headers:
+          JSON_HEADERS,
       },
     );
   }
 
   try {
     const result =
-      await runAgent(body);
+      await runAgent(
+        body,
+      );
 
     if (!result.ok) {
-      const status =
-        result.code ===
-        "INVALID_REQUEST"
-          ? 400
-          : 503;
-
-      const response: ChatApiErrorResponse = {
-        ok: false,
-        error: {
-          code: result.code,
-          message:
-            result.message,
-        },
-      };
-
       return NextResponse.json(
-        response,
         {
-          status,
-          headers: JSON_HEADERS,
+          ok:
+            false,
+
+          error: {
+            code:
+              result.code,
+
+            message:
+              result.message,
+          },
+        },
+
+        {
+          status:
+            result.code ===
+            "INVALID_REQUEST"
+              ? 400
+              : 503,
+
+          headers:
+            JSON_HEADERS,
         },
       );
     }
 
+    /*
+     * Doctor provider results get an explicit
+     * reservation-summary invitation.
+     *
+     * This does NOT create provider data.
+     * The provider list is still exactly what
+     * came from the trusted database tool.
+     */
+    let response =
+      result.response;
+
+    if (
+      response.action ===
+      "provider_results"
+    ) {
+      const containsDoctor =
+        response.providers.some(
+          (provider) =>
+            provider.providerType ===
+            "doctor",
+        );
+
+      if (containsDoctor) {
+        const language =
+          result.state
+            .conversationState
+            .responseLanguage;
+
+        response = {
+          ...response,
+
+          message: `${response.message}\n\n${doctorSharePrompt(
+            language,
+          )}`,
+        };
+      }
+    }
+
     return NextResponse.json(
       {
-        ok: true,
+        ok:
+          true,
 
-        response:
-          result.response,
+        response,
+
+        conversationState:
+          result.state
+            .conversationState,
 
         meta: {
           aiUsed:
-            result.meta.aiUsed,
+            result.meta
+              .aiUsed,
 
-          ...(result.meta.toolUsed
+          ...(result.meta
+            .toolUsed
             ? {
                 toolUsed:
-                  result.meta.toolUsed,
+                  result.meta
+                    .toolUsed,
               }
             : {}),
         },
       },
+
       {
-        status: 200,
-        headers: JSON_HEADERS,
+        status:
+          200,
+
+        headers:
+          JSON_HEADERS,
       },
     );
   } catch (error) {
@@ -116,21 +178,26 @@ export async function POST(
       },
     );
 
-    const response: ChatApiErrorResponse = {
-      ok: false,
-
-      error: {
-        code: "INTERNAL_ERROR",
-        message:
-          "The request could not be completed.",
-      },
-    };
-
     return NextResponse.json(
-      response,
       {
-        status: 500,
-        headers: JSON_HEADERS,
+        ok:
+          false,
+
+        error: {
+          code:
+            "INTERNAL_ERROR",
+
+          message:
+            "An unexpected error occurred.",
+        },
+      },
+
+      {
+        status:
+          500,
+
+        headers:
+          JSON_HEADERS,
       },
     );
   }
