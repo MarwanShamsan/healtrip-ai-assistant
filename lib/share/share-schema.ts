@@ -41,6 +41,19 @@ export const shareRequestSchema =
           .max(100),
 
       /*
+       * User-reviewed information to include
+       * in the reservation summary. The UI
+       * prefills this from user-authored chat
+       * messages, but the user may edit it.
+       */
+      reportedConcern:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(8000),
+
+      /*
        * Structured state only.
        *
        * We do not send the entire raw chat

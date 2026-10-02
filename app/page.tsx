@@ -356,8 +356,10 @@ const copy = {
       "Prepare reservation summary",
     sharePrompt:
       "If you already have a reservation with one of these doctors, select the doctor and provide the reservation reference. HealTrip can prepare a concise summary for review before sharing.",
-    noSummary:
-      "A reservation summary can be prepared after HealTrip completes a health assessment in this conversation.",
+    reportedInformation:
+      "Information to share",
+    reportedInformationHint:
+      "This field is prefilled from what you told HealTrip. Review and edit it before creating the summary.",
     selectedDoctor:
       "Selected doctor",
     reservationReference:
@@ -447,8 +449,10 @@ const copy = {
       "إعداد ملخص للحجز",
     sharePrompt:
       "إذا كان لديك حجز مع أحد هؤلاء الأطباء، اختر الطبيب وأدخل مرجع الحجز. يمكن لـ HealTrip إعداد ملخص مختصر للمراجعة قبل المشاركة.",
-    noSummary:
-      "يمكن إعداد ملخص الحجز بعد أن يكمل HealTrip التقييم الصحي في هذه المحادثة.",
+    reportedInformation:
+      "المعلومات المراد مشاركتها",
+    reportedInformationHint:
+      "تم تعبئة هذا الحقل مسبقًا من المعلومات التي ذكرتها لـ HealTrip. راجعها وعدّلها قبل إعداد الملخص.",
     selectedDoctor:
       "الطبيب المختار",
     reservationReference:
@@ -598,10 +602,37 @@ function getMessageBubbleClasses(
   return "border border-slate-200 bg-white text-slate-800 shadow-sm";
 }
 
+function buildReportedInformation(
+  messages: ChatMessage[],
+  fallbackSummary: string | null | undefined,
+): string {
+  const userProvidedInformation =
+    messages
+      .filter(
+        (message) =>
+          message.role ===
+          "user",
+      )
+      .map((message) =>
+        message.content.trim(),
+      )
+      .filter(Boolean)
+      .join("\n");
+
+  const value =
+    userProvidedInformation ||
+    fallbackSummary?.trim() ||
+    "";
+
+  return value.slice(
+    0,
+    8000,
+  );
+}
+
 function ProviderCard({
   provider,
   locale,
-  canPrepareShare,
   selected,
   onSelectDoctor,
 }: {
@@ -609,8 +640,6 @@ function ProviderCard({
     Provider;
   locale:
     Locale;
-  canPrepareShare:
-    boolean;
   selected:
     boolean;
   onSelectDoctor:
@@ -627,15 +656,15 @@ function ProviderCard({
   ) {
     return (
       <div
-        className={`group rounded-3xl border bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+        className={`group min-w-0 rounded-3xl border bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
           selected
             ? "border-cyan-500 ring-2 ring-cyan-100"
             : "border-slate-200"
         }`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
           <div>
-            <p className="text-lg font-semibold text-slate-900">
+            <p className="break-words text-lg font-semibold text-slate-900 [overflow-wrap:anywhere]">
               {provider.name}
             </p>
 
@@ -644,7 +673,7 @@ function ProviderCard({
             </p>
           </div>
 
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          <span className="max-w-full self-start break-words rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 [overflow-wrap:anywhere]">
             {provider.specialty}
           </span>
         </div>
@@ -698,31 +727,23 @@ function ProviderCard({
 
         <button
           type="button"
-          disabled={
-            !canPrepareShare
-          }
           onClick={() =>
             onSelectDoctor(
               provider,
             )
           }
-          className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 disabled:shadow-none"
+          className="mt-5 inline-flex w-full touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg"
         >
           {t.prepareSummary}
         </button>
 
-        {!canPrepareShare && (
-          <p className="mt-3 text-xs leading-5 text-slate-500">
-            {t.noSummary}
-          </p>
-        )}
       </div>
     );
   }
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5">
+      <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <p className="text-lg font-semibold text-slate-900">
             {provider.name}
@@ -830,6 +851,12 @@ export default function Home() {
     useState("");
 
   const [
+    reportedConcernDraft,
+    setReportedConcernDraft,
+  ] =
+    useState("");
+
+  const [
     preparedShare,
     setPreparedShare,
   ] =
@@ -894,12 +921,6 @@ export default function Home() {
   const shareCopy =
     copy[shareLocale];
 
-  const canPrepareShare =
-    Boolean(
-      conversationState
-        ?.lastClinicalSummary,
-    );
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView(
       {
@@ -917,17 +938,18 @@ export default function Home() {
   function selectDoctor(
     doctor: DoctorProvider,
   ) {
-    if (
-      !canPrepareShare
-    ) {
-      return;
-    }
-
     setSelectedDoctor(
       doctor,
     );
     setReservationReference(
       "",
+    );
+    setReportedConcernDraft(
+      buildReportedInformation(
+        messages,
+        conversationState
+          ?.lastClinicalSummary,
+      ),
     );
     setPreparedShare(
       null,
@@ -942,6 +964,9 @@ export default function Home() {
       null,
     );
     setReservationReference(
+      "",
+    );
+    setReportedConcernDraft(
       "",
     );
     setPreparedShare(
@@ -960,7 +985,8 @@ export default function Home() {
     if (
       !selectedDoctor ||
       !conversationState ||
-      !reservationReference.trim()
+      !reservationReference.trim() ||
+      !reportedConcernDraft.trim()
     ) {
       return;
     }
@@ -990,6 +1016,8 @@ export default function Home() {
                   selectedDoctor.id,
                 reservationReference:
                   reservationReference.trim(),
+                reportedConcern:
+                  reportedConcernDraft.trim(),
                 conversationState,
                 consent:
                   mode ===
@@ -1144,6 +1172,9 @@ export default function Home() {
         setReservationReference(
           "",
         );
+        setReportedConcernDraft(
+          "",
+        );
         setPreparedShare(
           null,
         );
@@ -1264,10 +1295,10 @@ export default function Home() {
   return (
     <main
       dir={direction}
-      className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(180deg,_#f8fbff_0%,_#eef7fb_50%,_#f8fafc_100%)] text-slate-900"
+      className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(180deg,_#f8fbff_0%,_#eef7fb_50%,_#f8fafc_100%)] text-slate-900"
     >
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-5 sm:px-6 lg:px-8">
-        <header className="mb-5 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-xl shadow-sky-100/40 backdrop-blur sm:p-6">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-3 py-3 sm:px-6 sm:py-5 lg:px-8">
+        <header className="mb-3 rounded-3xl border border-white/70 bg-white/85 p-4 shadow-xl shadow-sky-100/40 backdrop-blur sm:mb-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-3 rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-sm font-medium text-cyan-800">
@@ -1284,8 +1315,8 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-1">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="grid w-full grid-cols-2 rounded-2xl border border-slate-200 bg-slate-50 p-1 sm:w-auto">
                 <button
                   type="button"
                   onClick={() =>
@@ -1330,7 +1361,7 @@ export default function Home() {
                   isLoading ||
                   shareLoading
                 }
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full touch-manipulation rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 {t.newChat}
               </button>
@@ -1367,9 +1398,9 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="flex flex-1 overflow-hidden rounded-[30px] border border-white/70 bg-white/85 shadow-2xl shadow-sky-100/30 backdrop-blur">
-          <div className="flex min-h-[72vh] w-full flex-col">
-            <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+        <section className="flex min-w-0 flex-1 overflow-hidden rounded-3xl border border-white/70 bg-white/85 shadow-2xl shadow-sky-100/30 backdrop-blur">
+          <div className="flex min-h-[68dvh] min-w-0 w-full flex-col sm:min-h-[72vh]">
+            <div className="min-w-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
               {messages.length ===
               0 ? (
                 <div className="mx-auto max-w-2xl py-16 text-center">
@@ -1416,7 +1447,7 @@ export default function Home() {
                           key={
                             message.id
                           }
-                          className={`flex gap-3 ${
+                          className={`flex min-w-0 gap-2 sm:gap-3 ${
                             isUser
                               ? "justify-end"
                               : "justify-start"
@@ -1428,7 +1459,7 @@ export default function Home() {
                             </div>
                           )}
 
-                          <div className="w-full max-w-3xl">
+                          <div className="min-w-0 w-full max-w-3xl">
                             <div
                               className={`mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
                                 isUser
@@ -1452,7 +1483,7 @@ export default function Home() {
                                     ? "rtl"
                                     : "ltr"
                               }
-                              className={`rounded-[24px] px-4 py-4 text-sm leading-7 sm:px-5 sm:py-4 sm:text-[15px] ${getMessageBubbleClasses(
+                              className={`break-words rounded-[24px] px-4 py-4 text-sm leading-7 [overflow-wrap:anywhere] sm:px-5 sm:py-4 sm:text-[15px] ${getMessageBubbleClasses(
                                 message.role,
                                 message.action,
                               )}`}
@@ -1498,9 +1529,6 @@ export default function Home() {
                                         locale={
                                           messageLocale
                                         }
-                                        canPrepareShare={
-                                          canPrepareShare
-                                        }
                                         selected={
                                           selectedDoctor?.id ===
                                           provider.id
@@ -1515,9 +1543,7 @@ export default function Home() {
 
                                 {hasDoctors && (
                                   <div className="rounded-3xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-sky-50 px-5 py-4 text-sm leading-6 text-slate-700 shadow-sm">
-                                    {canPrepareShare
-                                      ? messageCopy.sharePrompt
-                                      : messageCopy.noSummary}
+                                    {messageCopy.sharePrompt}
                                   </div>
                                 )}
                               </div>
@@ -1542,9 +1568,9 @@ export default function Home() {
                           ? "rtl"
                           : "ltr"
                       }
-                      className="rounded-[28px] border border-cyan-100 bg-gradient-to-r from-sky-50 to-cyan-50 p-5 shadow-sm"
+                      className="min-w-0 rounded-[28px] border border-cyan-100 bg-gradient-to-r from-sky-50 to-cyan-50 p-4 shadow-sm sm:p-5"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             {
@@ -1577,12 +1603,53 @@ export default function Home() {
                           disabled={
                             shareLoading
                           }
-                          className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                          className="w-full touch-manipulation rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
                         >
                           {
                             shareCopy.cancel
                           }
                         </button>
+                      </div>
+
+                      <div className="mt-5">
+                        <label className="text-sm font-semibold text-slate-800">
+                          {
+                            shareCopy.reportedInformation
+                          }
+                        </label>
+
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          {
+                            shareCopy.reportedInformationHint
+                          }
+                        </p>
+
+                        <textarea
+                          value={
+                            reportedConcernDraft
+                          }
+                          onChange={(
+                            event,
+                          ) => {
+                            setReportedConcernDraft(
+                              event
+                                .target
+                                .value,
+                            );
+                            setPreparedShare(
+                              null,
+                            );
+                            setShareError(
+                              null,
+                            );
+                          }}
+                          maxLength={
+                            8000
+                          }
+                          rows={6}
+                          dir="auto"
+                          className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base leading-6 text-slate-900 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 sm:text-sm"
+                        />
                       </div>
 
                       <div className="mt-5">
@@ -1617,7 +1684,7 @@ export default function Home() {
                           maxLength={
                             100
                           }
-                          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100"
+                          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm outline-none transition focus:border-cyan-400 focus:ring-4 focus:ring-cyan-100 sm:text-sm"
                         />
                       </div>
 
@@ -1626,14 +1693,15 @@ export default function Home() {
                           type="button"
                           disabled={
                             shareLoading ||
-                            !reservationReference.trim()
+                            !reservationReference.trim() ||
+                            !reportedConcernDraft.trim()
                           }
                           onClick={() =>
                             void callShareApi(
                               "preview",
                             )
                           }
-                          className="mt-4 inline-flex rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mt-4 inline-flex w-full touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                         >
                           {shareLoading
                             ? shareCopy.preparing
@@ -1650,7 +1718,7 @@ export default function Home() {
                       )}
 
                       {preparedShare && (
-                        <div className="mt-5 rounded-3xl border border-white/70 bg-white p-5 shadow-sm">
+                        <div className="mt-5 min-w-0 rounded-3xl border border-white/70 bg-white p-4 shadow-sm sm:p-5">
                           <h3 className="text-lg font-bold text-slate-900">
                             {preparedShare.status ===
                             "ready_to_share"
@@ -1749,7 +1817,7 @@ export default function Home() {
                                     "confirm",
                                   )
                                 }
-                                className="mt-4 inline-flex rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg disabled:opacity-50"
+                                className="mt-4 inline-flex w-full touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition hover:opacity-95 hover:shadow-lg disabled:opacity-50 sm:w-auto"
                               >
                                 {shareLoading
                                   ? shareCopy.confirming
@@ -1797,10 +1865,10 @@ export default function Home() {
               onSubmit={
                 handleSubmit
               }
-              className="border-t border-slate-200 bg-white/90 px-4 py-4 backdrop-blur sm:px-6"
+              className="healtrip-composer border-t border-slate-200 bg-white/90 px-3 py-3 backdrop-blur sm:px-6 sm:py-4"
             >
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-3 shadow-inner">
-                <div className="flex items-end gap-3">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-2 shadow-inner sm:rounded-[28px] sm:p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
                   <textarea
                     ref={
                       textareaRef
@@ -1830,7 +1898,7 @@ export default function Home() {
                       isLoading
                     }
                     dir="auto"
-                    className="min-h-[56px] flex-1 resize-none rounded-2xl border border-transparent bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100"
+                    className="min-h-[56px] w-full min-w-0 flex-1 resize-none rounded-2xl border border-transparent bg-white px-4 py-3 text-base leading-6 text-slate-900 shadow-sm outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-100 sm:text-sm"
                   />
 
                   <button
@@ -1839,7 +1907,7 @@ export default function Home() {
                       isLoading ||
                       !input.trim()
                     }
-                    className="inline-flex min-h-[56px] items-center justify-center rounded-2xl bg-gradient-to-r from-[#062B73] to-[#16C7D8] px-5 text-sm font-semibold text-white shadow-lg shadow-cyan-200 transition hover:opacity-95 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-[52px] w-full touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-r from-[#062B73] to-[#16C7D8] px-5 text-sm font-semibold text-white shadow-lg shadow-cyan-200 transition hover:opacity-95 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[56px] sm:w-auto"
                   >
                     {isLoading
                       ? t.sending
@@ -1847,7 +1915,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                <p className="mt-2 px-1 text-xs text-slate-500">
+                <p className="mt-2 hidden px-1 text-xs text-slate-500 sm:block">
                   {t.inputHint}
                 </p>
               </div>

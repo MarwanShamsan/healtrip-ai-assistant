@@ -72,6 +72,7 @@ export async function POST(
     mode,
     doctorId,
     reservationReference,
+    reportedConcern,
     conversationState,
     consent,
   } = parsed.data;
@@ -107,21 +108,6 @@ export async function POST(
   }
 
   /*
-   * We only prepare a health summary if the
-   * clinical workflow actually produced one.
-   */
-  const reportedConcern =
-    conversationState.lastClinicalSummary;
-
-  if (!reportedConcern) {
-    return errorResponse(
-      409,
-      "NO_CLINICAL_SUMMARY",
-      "There is no clinical summary available to prepare for sharing.",
-    );
-  }
-
-  /*
    * Consent is mandatory before the workflow
    * can move from preview -> ready_to_share.
    */
@@ -145,8 +131,8 @@ export async function POST(
    * - inferred diagnosis
    * - provider data invented by AI
    *
-   * Only the existing structured clinical
-   * summary and recommendation are included.
+   * Only the user-reviewed reported information
+   * and the structured recommendation are included.
    */
   const preparedShare = {
     status:
