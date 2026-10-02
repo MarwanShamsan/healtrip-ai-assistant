@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
     "db:check": "tsx scripts/check-providers.ts",
     "tools:check-doctors": "tsx scripts/check-search-doctors.ts",
     "tools:check-hospitals": "tsx scripts/check-search-hospitals.ts",
